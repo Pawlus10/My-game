@@ -1,0 +1,684 @@
+Otwarto wątek. Jedna nieprzeczytana wiadomość.
+
+Przejdź do treści
+Korzystanie z usługi Gmail z czytnikami ekranu
+1 z 2 011
+(brak tematu)
+Odebrane
+
+Paweł Skamarski <p.skamarski@gmail.com>
+21:43 (1 minutę temu)
+do mnie
+
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Pixel Dash — Geometry-ish (z FPS i ustawieniami)</title>
+<style>
+:root{
+--bg:#0b1020;
+--panel:rgba(255,255,255,0.06);
+--accent:#ffcf4d;
+--muted:#c9d3e3;
+}
+html,body{height:100%;margin:0;background:linear-gradient(#071024,#071018 40%);font-family:Inter,system-ui,Arial;color:var(--muted);}
+.wrap{display:flex;flex-direction:column;align-items:center;padding:12px;gap:12px;box-sizing:border-box;}
+#main{width:100%;max-width:1024px;display:flex;gap:12px;align-items:flex-start;}
+#canvasWrap{flex:1;background:var(--panel);padding:12px;border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,0.6);position:relative;}
+canvas{background:#081227;border-radius:6px;display:block;width:100%;height:auto;image-rendering:pixelated;transform:translateZ(0);}
+#ui{width:320px;min-width:240px;}
+.card{background:rgba(255,255,255,0.04);padding:10px;border-radius:8px;margin-bottom:10px;}
+h1{margin:0;color:var(--accent);font-size:18px;}
+.muted{color:#9aa7bf;font-size:13px;}
+button{background:var(--accent);border:0;padding:8px 10px;border-radius:8px;cursor:pointer;font-weight:700;}
+.row{display:flex;justify-content:space-between;align-items:center;margin:8px 0;}
+.levels{display:flex;flex-direction:column;gap:6px;}
+.levelBtn{padding:8px;border-radius:6px;background:transparent;border:1px solid rgba(255,255,255,0.06);cursor:pointer;text-align:left;}
+.selected{box-shadow:inset 0 0 0 2px rgba(255,255,255,0.03);border-color:var(--accent);}
+.skins{display:flex;gap:6px;flex-wrap:wrap;}
+.skinBox{width:48px;height:48px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:700;cursor:pointer;border:1px solid rgba(255,255,255,0.05);}
+.skinLocked{opacity:0.4;filter:grayscale(50%);position:relative;}
+.skinLocked::after{content:'🔒';position:absolute;right:4px;top:4px;font-size:12px;}
+.controls{display:flex;gap:8px;}
+#touchControls{display:none;margin-top:8px;gap:8px;}
+.touchBtn{flex:1;padding:12px;border-radius:8px;background:#182434;text-align:center;color:var(--muted);user-select:none;}
+#progressWrap{margin-top:6px;background:#071226;padding:8px;border-radius:8px;}
+@media(max-width:820px){
+#main{flex-direction:column;}
+#ui{width:100%;}
+#touchControls{display:flex;}
+}
+.tiny{font-size:12px;color:#9aa7bf}
+.danger{background:#ff7a7a}
+/* FPS display */
+#fpsCounter{
+position:absolute; right:10px; top:10px;
+background:rgba(0,0,0,0.45); color:#fff; padding:6px 8px; border-radius:6px; font-family:monospace; font-weight:700;
+z-index:20; pointer-events:none; font-size:13px;
+}
+/* Settings inputs */
+.settingRow{display:flex;flex-direction:column;gap:6px;margin:8px 0;}
+input[type="range"]{width:100%;}
+select{width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div style="width:100%;max-width:1024px;display:flex;justify-content:space-between;align-items:center;">
+<h1>Pixel Dash — Geometry-ish</h1>
+<div class="tiny">Sterowanie: W / ↑ / Spacja / PPM = skok • Dotyk na ekranie</div>
+</div>
+
+<div id="main">
+<div id="canvasWrap" class="card">
+<div id="fpsCounter">FPS: 0</div>
+<canvas id="game" width="640" height="360"></canvas>
+<div id="progressWrap" class="tiny">
+Postęp: <span id="percent">0%</span> — <span id="levelName">—</span>
+<div style="height:8px;background:#001122;border-radius:6px;margin-top:6px;overflow:hidden;">
+<div id="pbar" style="height:100%;width:0%;background:linear-gradient(90deg,#ffcf4d,#ff7ab6);"></div>
+</div>
+</div>
+
+<div id="touchControls" style="display:flex;margin-top:8px;">
+<div id="touchJump" class="touchBtn">SKOK</div>
+<div id="touchPause" class="touchBtn">PAUZA</div>
+</div>
+</div>
+
+<div id="ui">
+<div class="card">
+<div style="display:flex;justify-content:space-between;align-items:center;">
+<div>
+<div style="font-weight:800">Menu</div>
+<div class="muted">Wybierz poziom, kostkę, ustawienia</div>
+</div>
+<div>
+<button id="toMenu" style="background:#2b3a52">Menu</button>
+</div>
+</div>
+</div>
+
+<div class="card">
+<div style="font-weight:700">Wybierz poziom</div>
+<div class="levels" id="levelsList"></div>
+</div>
+
+<div class="card">
+<div style="font-weight:700">Kształt kostki</div>
+<div style="display:flex;gap:8px;margin-top:8px;">
+<button class="shapeBtn" data-shape="square">Kwadrat</button>
+<button class="shapeBtn" data-shape="triangle">Trójkąt</button>
+<button class="shapeBtn" data-shape="circle">Kółko</button>
+</div>
+</div>
+
+<div class="card">
+<div style="font-weight:700">Malowanie / skiny</div>
+<div class="skins" id="skinsList"></div>
+<div class="tiny" style="margin-top:8px;">Odblokowujesz skiny za ukończenia poziomów.</div>
+</div>
+
+<div class="card">
+<div style="display:flex;gap:8px;">
+<button id="startBtn">Start</button>
+<button id="restartBtn" class="danger">Restart poziomu</button>
+</div>
+<div style="margin-top:8px;" class="tiny">Pauza: Esc • Powrót do menu: M</div>
+</div>
+
+<div class="card">
+<div style="font-weight:700">Ustawienia</div>
+<div class="settingRow">
+<label class="tiny">Głośność muzyki: <span id="volLabel">85%</span></label>
+<input id="volSlider" type="range" min="0" max="100" value="85">
+</div>
+<div class="settingRow">
+<label class="tiny">Limit FPS</label>
+<select id="fpsSelect">
+<option value="0">Bez limitu</option>
+<option value="60">60 FPS</option>
+<option value="120">120 FPS</option>
+</select>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+
+<script>
+/* Pixel Dash — Geometry-ish with FPS counter & settings
+- Adds FPS display and FPS limiting
+- Adds volume slider controlling master audio gain
+- Saves settings in localStorage
+*/
+
+// ---------- Storage & state ----------
+const SAVE_KEY = 'pixeldash_v2';
+let state = {
+unlockedSkins: { default:true },
+completed: {},
+chosenSkin: 'default',
+chosenShape: 'square',
+settings: { volume: 0.85, fpsLimit: 0 } // fpsLimit: 0 = unlimited, otherwise numeric
+};
+try{
+const s = JSON.parse(localStorage.getItem(SAVE_KEY));
+if(s) state = Object.assign(state, s);
+} catch(e){ console.warn('load err', e); }
+function save(){ localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }
+
+// ---------- Canvas & scaling ----------
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+function scaleCanvas(){
+canvas.style.width = Math.min(window.innerWidth-40, 960) + 'px';
+}
+window.addEventListener('resize', scaleCanvas);
+scaleCanvas();
+
+// ---------- Audio: WebAudio + master gain ----------
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+const audioCtx = new AudioContext();
+const masterGain = audioCtx.createGain();
+masterGain.gain.value = state.settings.volume ?? 0.85;
+masterGain.connect(audioCtx.destination);
+
+// expose a helper to set volume and save settings
+function setVolume(v){
+masterGain.gain.value = v;
+state.settings.volume = v;
+document.getElementById('volLabel').textContent = Math.round(v*100) + '%';
+save();
+}
+
+// ---------- FPS limiting & counter ----------
+let desiredFps = state.settings.fpsLimit ?? 0; // 0 = unlimited
+let minFrameTime = desiredFps > 0 ? (1000 / desiredFps) : 0;
+let lastRenderTime = performance.now();
+const fpsCounterEl = document.getElementById('fpsCounter');
+
+// FPS measuring (smoothed)
+let fpsSamples = [];
+function recordFrame(now){
+const dt = now - (window._lastFrameTime || now);
+window._lastFrameTime = now;
+if(dt <= 0) return;
+const fps = 1000 / dt;
+fpsSamples.push(fps);
+if(fpsSamples.length > 30) fpsSamples.shift();
+const avg = Math.round(fpsSamples.reduce((a,b)=>a+b,0)/fpsSamples.length);
+fpsCounterEl.textContent = 'FPS: ' + avg;
+}
+
+// update fps limiter when changed
+function setFpsLimit(val){
+desiredFps = Number(val);
+state.settings.fpsLimit = desiredFps;
+minFrameTime = desiredFps > 0 ? (1000 / desiredFps) : 0;
+save();
+}
+
+// ---------- Input ----------
+const input = { jump:false };
+window.addEventListener('keydown', (e)=>{
+if(e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp' || e.key === ' ') { input.jump = true; e.preventDefault(); }
+if(e.key === 'Escape') togglePause();
+if(e.key.toLowerCase()==='m') toMenu();
+});
+window.addEventListener('keyup', (e)=>{
+if(e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp' || e.key === ' ') input.jump = false;
+});
+window.addEventListener('contextmenu', e=>{ e.preventDefault(); input.jump = true; });
+canvas.addEventListener('mousedown', e=>{ input.jump = true; });
+canvas.addEventListener('mouseup', e=>{ input.jump = false; });
+
+// touch
+const touchJump = document.getElementById('touchJump');
+const touchPause = document.getElementById('touchPause');
+touchJump.addEventListener('touchstart', e=>{ e.preventDefault(); input.jump = true; }, {passive:false});
+touchJump.addEventListener('touchend', e=>{ e.preventDefault(); input.jump = false; }, {passive:false});
+touchPause.addEventListener('touchstart', e=>{ e.preventDefault(); togglePause(); }, {passive:false});
+
+// ---------- UI refs ----------
+const levelsList = document.getElementById('levelsList');
+const skinsList = document.getElementById('skinsList');
+const percentEl = document.getElementById('percent');
+const pbar = document.getElementById('pbar');
+const levelNameEl = document.getElementById('levelName');
+const startBtn = document.getElementById('startBtn');
+const restartBtn = document.getElementById('restartBtn');
+const toMenuBtn = document.getElementById('toMenu');
+const volSlider = document.getElementById('volSlider');
+const fpsSelect = document.getElementById('fpsSelect');
+
+// apply saved settings to sliders/select
+volSlider.value = Math.round((state.settings.volume ?? 0.85) * 100);
+document.getElementById('volLabel').textContent = Math.round((state.settings.volume ?? 0.85)*100) + '%';
+fpsSelect.value = state.settings.fpsLimit ?? 0;
+
+// ---------- Game Data: levels (same as before) ----------
+const LEVELS = [
+{ id:'easy', name:'Easy Groove', bpm:90, lengthBeats:64,
+pattern: [4,8,12,16,20,24,28,32,36,40,44,48,52,56,60],
+difficulty:1, reward:'neon' },
+{ id:'medium', name:'Mid Tempo', bpm:110, lengthBeats:96,
+pattern: [2,3,6,8,10,14,18,20,24,26,30,34,36,40,44,46,50,52,56,60,64,68,72,76],
+difficulty:1.4, reward:'lava' },
+{ id:'hard', name:'Hard Rhythm', bpm:135, lengthBeats:128,
+pattern: (function(){ let a=[]; for(let i=2;i<128;i+=2){ if(Math.random()>0.18) a.push(i); } a.push(10,11,12,30,31,32,70,71,72,100,101,102); return a.sort((x,y)=>x-y);} )(), difficulty:1.9, reward:'aqua' },
+{ id:'demon', name:'DEMON', bpm:160, lengthBeats:200,
+pattern: (function(){ let a=[]; for(let i=1;i<200;i++){ if(Math.random()>0.42) a.push(i); if(i%16===0){ a.push(i+0.2,i+0.4,i+0.6);} } for(let s of [40,65,90,125,150]){ a.push(s, s+0.5, s+1, s+1.5, s+2); } return a.map(x=>Math.round(x*2)/2).sort((x,y)=>x-y);} )(), difficulty:3.5, reward:'demonPaint' }
+];
+
+// ---------- Skins ----------
+const SKINS = {
+default: { name:'Classic', colorA:'#6ef', colorB:'#3ac', unlocked:true },
+neon: { name:'Neon', colorA:'#ff4dff', colorB:'#4dfffa', unlocked:false },
+lava: { name:'Lava', colorA:'#ff7a2d', colorB:'#ff2d2d', unlocked:false },
+aqua: { name:'Aqua', colorA:'#4de6ff', colorB:'#2d9bff', unlocked:false },
+demonPaint: { name:'Demon', colorA:'#ff3b88', colorB:'#8b2dff', unlocked:false }
+};
+for(let k in SKINS) if(state.unlockedSkins[k]) SKINS[k].unlocked = true;
+
+// ---------- Render UI lists ----------
+let chosenLevel = LEVELS[0];
+function renderLevelButtons(){
+levelsList.innerHTML = '';
+LEVELS.forEach(l=>{
+const btn = document.createElement('button');
+btn.className = 'levelBtn' + (l.id===chosenLevel.id ? ' selected' : '');
+btn.innerHTML = `<div style="font-weight:700">${l.name}</div><div class="tiny">BPM: ${l.bpm} • Beats: ${l.lengthBeats}</div>`;
+btn.onclick = ()=>{
+chosenLevel = l; renderLevelButtons(); updateLevelLabel();
+};
+if(state.completed[l.id]) { btn.style.borderColor = '#7bf59f'; btn.innerHTML += '<div style="color:#7bf59f;font-weight:700;margin-top:4px;">Ukończono</div>'; }
+levelsList.appendChild(btn);
+});
+}
+renderLevelButtons();
+
+function renderSkins(){
+skinsList.innerHTML = '';
+for(let key in SKINS){
+const s = SKINS[key];
+const box = document.createElement('div');
+box.className = 'skinBox' + (s.unlocked ? '' : ' skinLocked');
+box.title = s.name + (s.unlocked ? '' : ' (zablokowany)');
+box.style.background = `linear-gradient(135deg, ${s.colorA}, ${s.colorB})`;
+box.onclick = ()=>{
+if(!s.unlocked) return alert('Skin zablokowany — ukończ poziom aby odblokować!');
+state.chosenSkin = key; save();
+document.querySelectorAll('.skinBox').forEach(n=>n.style.outline='none');
+box.style.outline = '3px solid rgba(255,255,255,0.06)';
+};
+if(state.chosenSkin === key) box.style.outline = '3px solid rgba(255,255,255,0.06)';
+box.textContent = '';
+skinsList.appendChild(box);
+}
+}
+renderSkins();
+updateLevelLabel();
+
+// shape buttons
+document.querySelectorAll('.shapeBtn').forEach(b=>{
+b.onclick = ()=>{
+state.chosenShape = b.dataset.shape;
+save();
+document.querySelectorAll('.shapeBtn').forEach(x=>x.style.boxShadow='none');
+b.style.boxShadow = 'inset 0 0 0 2px rgba(255,255,255,0.03)';
+};
+});
+if(state.chosenShape){
+document.querySelectorAll('.shapeBtn').forEach(b=>{ if(b.dataset.shape===state.chosenShape) b.style.boxShadow = 'inset 0 0 0 2px rgba(255,255,255,0.03)'; });
+}
+
+// ---------- Game objects & engine (same as before, with small adjustments) ----------
+let game = {
+running:false, paused:false, t:0, startTime:0, currentBeat:0,
+obstacles: [], player: { x:80, y: H - 60, w:18, h:18, vy:0, onGround:true },
+beatPx:48, levelEndX:2000, levelProgress:0, levelBeats:0, bpm:120, reward:null
+};
+
+function initLevel(l){
+game.running = true; game.paused = false; game.t = 0; game.startTime = performance.now();
+game.obstacles = [];
+game.player.x = 80; game.player.y = H - 80; game.player.vy = 0; game.player.onGround = true;
+game.currentBeat = 0;
+
+const beatPx = 48;
+game.beatPx = beatPx;
+game.levelEndX = Math.max(1200, l.lengthBeats * game.beatPx);
+game.levelBeats = l.lengthBeats;
+game.bpm = l.bpm;
+
+const startX = W + 160;
+for(let b of l.pattern){
+const rand = Math.random();
+const h = (rand < 0.4) ? 22 : (rand < 0.75 ? 40 : 12);
+const y = H - 36 - (h-12);
+const x = startX + Math.round(b * game.beatPx);
+game.obstacles.push({ x, y, w: 22, h:h, passed:false });
+if(Math.random() < 0.12 && l.id !== 'easy'){
+game.obstacles.push({ x: x + 46 + Math.round(Math.random()*20), y: y - (Math.random()>0.5?20:0), w: 20, h: 18, passed:false });
+}
+}
+game.obstacles.sort((a,b)=>a.x-b.x);
+game.reward = l.reward;
+chosenLevel = l;
+updateLevelLabel();
+updateUIProgress(0);
+musicEngine.startLevel(l);
+}
+
+// ---------- Music Engine (procedural) ----------
+const musicEngine = {
+tempo:120, playing:false, startAt:0, schedulerId:null,
+scheduleAhead:0.5, nextNoteTime:0, beatIndex:0, level:null,
+startLevel(l){
+this.stop();
+if(audioCtx.state === 'suspended') audioCtx.resume();
+this.tempo = l.bpm;
+this.beatIndex = 0;
+this.nextNoteTime = audioCtx.currentTime + 0.06;
+this.playing = true;
+this.pattern = l.pattern.slice();
+this.level = l;
+this.scheduler();
+},
+stop(){ this.playing = false; if(this.schedulerId){ cancelAnimationFrame(this.schedulerId); this.schedulerId = null; } },
+scheduler(){
+const lookAhead = this.scheduleAhead;
+while(this.nextNoteTime < audioCtx.currentTime + lookAhead){
+this.playBeat(this.nextNoteTime, this.beatIndex, this.level);
+this.nextNoteTime += 60/this.tempo;
+this.beatIndex++;
+}
+this.schedulerId = requestAnimationFrame(()=>this.scheduler());
+},
+playBeat(time, beatIdx, level){
+const kick = audioCtx.createOscillator();
+const kGain = audioCtx.createGain();
+kick.type = 'sine';
+kick.frequency.setValueAtTime(120, time);
+kGain.gain.setValueAtTime(0.0001, time);
+kGain.gain.exponentialRampToValueAtTime(0.9, time+0.001);
+kGain.gain.exponentialRampToValueAtTime(0.0001, time+0.16);
+kick.connect(kGain); kGain.connect(masterGain);
+kick.start(time); kick.stop(time+0.18);
+
+if(beatIdx % 2 === 0){
+const hat = audioCtx.createOscillator();
+hat.type = 'square';
+hat.frequency.setValueAtTime(8000, time);
+const hGain = audioCtx.createGain();
+hGain.gain.setValueAtTime(0.0001, time);
+hGain.gain.exponentialRampToValueAtTime(0.18, time+0.001);
+hGain.gain.exponentialRampToValueAtTime(0.0001, time+0.06);
+hat.connect(hGain); hGain.connect(masterGain);
+hat.start(time); hat.stop(time+0.06);
+}
+
+const melodyChance = { easy:0.3, medium:0.45, hard:0.6, demon:0.85 }[level.id] || 0.4;
+if(Math.random() < melodyChance){
+const osc = audioCtx.createOscillator();
+osc.type = 'triangle';
+const base = { easy:440, medium:380, hard:330, demon:300 }[level.id] || 400;
+osc.frequency.setValueAtTime(base * (1 + Math.sin(beatIdx*0.3)), time);
+const g = audioCtx.createGain();
+g.gain.setValueAtTime(0.0001, time);
+g.gain.exponentialRampToValueAtTime(0.12, time+0.001);
+g.gain.exponentialRampToValueAtTime(0.0001, time+0.12);
+osc.connect(g); g.connect(masterGain);
+osc.start(time); osc.stop(time+0.16);
+}
+this.beatIndex = beatIdx;
+}
+};
+
+// ---------- Sounds ----------
+function playClick(vol=0.08){
+const o = audioCtx.createOscillator();
+const g = audioCtx.createGain();
+o.type = 'square'; o.frequency.value = 700;
+g.gain.value = vol;
+o.connect(g); g.connect(masterGain);
+o.start(); o.stop(audioCtx.currentTime + 0.06);
+}
+function playDeath(){
+const o = audioCtx.createOscillator();
+const g = audioCtx.createGain();
+o.type = 'sawtooth'; o.frequency.setValueAtTime(220, audioCtx.currentTime);
+g.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+g.gain.exponentialRampToValueAtTime(0.6, audioCtx.currentTime + 0.02);
+g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.6);
+o.connect(g); g.connect(masterGain);
+o.start(); o.stop(audioCtx.currentTime + 0.62);
+}
+
+// ---------- Physics & update ----------
+function updateGame(dt){
+if(!game.running || game.paused) return;
+const seconds = dt / 1000;
+game.t += seconds;
+
+const speedPxPerSec = (chosenLevel.bpm/60) * game.beatPx * 1.0 * chosenLevel.difficulty * 0.6;
+const distThisFrame = speedPxPerSec * seconds;
+for(let o of game.obstacles) o.x -= distThisFrame;
+
+const gravity = 1100;
+const jumpForce = 420;
+if(input.jump && game.player.onGround){
+game.player.vy = -jumpForce;
+game.player.onGround = false;
+input.jump = false;
+playClick(0.14);
+}
+game.player.vy += gravity * seconds;
+game.player.y += game.player.vy * seconds;
+const groundY = H - 56;
+if(game.player.y >= groundY){ game.player.y = groundY; game.player.vy = 0; game.player.onGround = true; }
+
+for(let ob of game.obstacles){
+if(ob.passed) continue;
+const px = game.player.x, py = game.player.y, pw = game.player.w, ph = game.player.h;
+if(px + pw > ob.x && px < ob.x + ob.w && py + ph > ob.y && py < ob.y + ob.h){
+onPlayerDeath(); return;
+}
+if(ob.x + ob.w < px - 20) ob.passed = true;
+}
+
+const startX = W + 160;
+const farthestX = Math.max(...game.obstacles.map(o=>o.x));
+let pct = 1 - (farthestX / (startX + game.levelEndX));
+pct = Math.max(0, Math.min(1, pct));
+game.levelProgress = pct;
+updateUIProgress(Math.round(pct*100));
+
+const allPassed = game.obstacles.every(o => o.passed || o.x + o.w < -120);
+if(allPassed) onLevelComplete();
+}
+
+// ---------- Handlers ----------
+function onPlayerDeath(){
+playDeath();
+game.running = false;
+musicEngine.stop();
+showToast('Przegrałeś — spróbuj jeszcze raz!');
+}
+function onLevelComplete(){
+game.running = false;
+musicEngine.stop();
+if(game.reward && !SKINS[game.reward].unlocked){
+SKINS[game.reward].unlocked = true;
+state.unlockedSkins[game.reward] = true;
+state.chosenSkin = game.reward;
+save();
+renderSkins();
+showToast('Poziom ukończony! Odblokowano skin: ' + SKINS[game.reward].name);
+} else {
+showToast('Gratulacje — ukończono poziom!');
+}
+state.completed[chosenLevel.id] = true; save();
+renderLevelButtons();
+}
+
+// ---------- Render ----------
+function draw(){
+ctx.clearRect(0,0,W,H);
+const g = ctx.createLinearGradient(0,0,0,H);
+g.addColorStop(0,'#072b4a'); g.addColorStop(1,'#021023');
+ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+
+const pulse = 0.6 + 0.4*Math.sin(game.t*5 + musicEngine.beatIndex*0.2);
+for(let i=0;i<6;i++){
+ctx.fillStyle = `rgba(255,255,255,${0.02 + (i%2?0.01:0.02)*pulse})`;
+ctx.fillRect(i*(W/6), H*0.12, W/6 - 6, 4);
+}
+
+ctx.fillStyle = '#081822'; ctx.fillRect(0, H-56, W, 56);
+for(let ob of game.obstacles){
+if(ob.x > W + 80 || ob.x < -200) continue;
+ctx.fillStyle = '#ff6b6b';
+ctx.fillRect(Math.round(ob.x), Math.round(ob.y), ob.w, ob.h);
+ctx.fillStyle = '#2a1b1b';
+for(let s=0;s<3;s++){
+ctx.beginPath();
+const sx = Math.round(ob.x + s*(ob.w/3) + 3);
+ctx.moveTo(sx, ob.y);
+ctx.lineTo(sx + ob.w/6, ob.y - 10);
+ctx.lineTo(sx + ob.w/3 - 2, ob.y);
+ctx.closePath();
+ctx.fill();
+}
+}
+
+const skin = SKINS[state.chosenSkin] ? SKINS[state.chosenSkin] : SKINS['default'];
+drawPlayer(game.player.x, game.player.y, game.player.w, game.player.h, skin.colorA, skin.colorB, state.chosenShape);
+
+ctx.fillStyle = '#ffffff10';
+ctx.fillRect(W-120, 12, 100, 12);
+ctx.fillStyle = '#fff';
+ctx.font = '12px monospace';
+ctx.fillText('BPM: ' + (chosenLevel?chosenLevel.bpm:'-'), W-118, 22);
+}
+
+function drawPlayer(x,y,w,h, c1, c2, shape){
+ctx.save(); ctx.translate(x,y);
+ctx.fillStyle = '#0008'; ctx.fillRect(-2, h + 2, w+4, 4);
+ctx.fillStyle = c1;
+if(shape === 'square') roundRect(ctx,0,0,w,h,3,true,false);
+else if(shape === 'triangle'){ ctx.beginPath(); ctx.moveTo(w/2,0); ctx.lineTo(w,h); ctx.lineTo(0,h); ctx.closePath(); ctx.fill(); }
+else if(shape === 'circle'){ ctx.beginPath(); ctx.ellipse(w/2,h/2,w/2,h/2,0,0,Math.PI*2); ctx.fill(); }
+else roundRect(ctx,0,0,w,h,3,true,false);
+ctx.fillStyle = c2; ctx.globalAlpha = 0.9;
+if(shape === 'triangle') ctx.fillRect(w*0.5 - 4, Math.round(h*0.35), 6, Math.round(h*0.5));
+else ctx.fillRect(Math.round(w*0.2), Math.round(h*0.15), Math.round(w*0.6), Math.round(h*0.25));
+ctx.restore(); ctx.globalAlpha = 1;
+}
+function roundRect(ctx, x, y, w, h, r, fill, stroke){
+if (typeof r === 'undefined') r = 5;
+ctx.beginPath();
+ctx.moveTo(x + r, y);
+ctx.arcTo(x + w, y, x + w, y + h, r);
+ctx.arcTo(x + w, y + h, x, y + h, r);
+ctx.arcTo(x, y + h, x, y, r);
+ctx.arcTo(x, y, x + w, y, r);
+ctx.closePath();
+if (fill) ctx.fill();
+if (stroke) ctx.stroke();
+}
+
+// ---------- UI helpers ----------
+function updateUIProgress(pct){
+percentEl.textContent = pct + '%';
+pbar.style.width = pct + '%';
+levelNameEl.textContent = chosenLevel ? chosenLevel.name : '—';
+}
+function updateLevelLabel(){ levelNameEl.textContent = chosenLevel ? chosenLevel.name : '—'; renderLevelButtons(); }
+
+// ---------- Toast ----------
+let toastTimer = null;
+function showToast(text){
+const el = document.createElement('div');
+el.style.position='fixed'; el.style.left='50%'; el.style.top='18%';
+el.style.transform='translateX(-50%)'; el.style.background='rgba(0,0,0,0.6)';
+el.style.color='white'; el.style.padding='12px 18px'; el.style.borderRadius='8px'; el.style.zIndex=9999;
+el.textContent = text;
+document.body.appendChild(el);
+if(toastTimer) clearTimeout(toastTimer);
+toastTimer = setTimeout(()=>{ el.remove(); }, 2400);
+}
+
+// ---------- Start/Pause/Menu ----------
+startBtn.onclick = ()=>{ if(!chosenLevel) return alert('Wybierz poziom!'); initLevel(chosenLevel); };
+restartBtn.onclick = ()=>{ initLevel(chosenLevel); };
+toMenuBtn.onclick = toMenu;
+function togglePause(){ if(!game.running) return; game.paused = !game.paused; if(game.paused){ musicEngine.stop(); showToast('PAUZA'); } else { musicEngine.startLevel(chosenLevel); showToast('Wznawiam'); } }
+function toMenu(){ musicEngine.stop(); game.running = false; game.paused = false; showToast('Powrót do menu'); }
+
+// ---------- Main loop with FPS limiting ----------
+let last = performance.now();
+let accRender = 0;
+function mainLoop(now){
+// FPS counter record
+recordFrame(now);
+
+// apply fps limit: only update/render if enough time passed
+if(minFrameTime === 0){
+// unlimited — always update/render
+const dt = now - last; last = now;
+updateGame(dt); draw();
+} else {
+const dt = now - last;
+if(dt >= minFrameTime - 0.5){ // small tolerance
+last = now;
+updateGame(dt); draw();
+}
+}
+
+requestAnimationFrame(mainLoop);
+}
+requestAnimationFrame(mainLoop);
+
+// ---------- Init skins UI and saved settings ----------
+function applySavedSkins(){
+for(let k in state.unlockedSkins) if(state.unlockedSkins[k]) SKINS[k].unlocked = true;
+if(state.chosenSkin && SKINS[state.chosenSkin]) SKINS[state.chosenSkin].unlocked = true;
+renderSkins();
+}
+applySavedSkins();
+
+// ---------- Volume and FPS UI hookups ----------
+volSlider.addEventListener('input', (e)=>{
+const v = Number(e.target.value)/100;
+setVolume(v);
+});
+fpsSelect.addEventListener('change', (e)=>{
+const v = Number(e.target.value);
+setFpsLimit(v);
+});
+
+// initialize values
+setVolume(state.settings.volume ?? 0.85);
+setFpsLimit(state.settings.fpsLimit ?? 0);
+
+// ---------- apply saved UI selection highlights ----------
+renderSkins();
+renderLevelButtons();
+
+// ---------- small UX improvements ----------
+window.addEventListener('click', ()=>{ if(audioCtx.state === 'suspended') audioCtx.resume(); }, {once:true});
+document.addEventListener('touchstart', function aa(){ if(audioCtx.state === 'suspended') audioCtx.resume(); document.removeEventListener('touchstart', aa); }, {passive:true});
+
+// ---------- export for debugging (optional) ----------
+window._pd = { state, setVolume, setFpsLimit, initLevel };
+
+// ---------- end ----------
+</script>
+</body>
+</html>
